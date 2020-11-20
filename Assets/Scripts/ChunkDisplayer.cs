@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class ChunkDisplayer : MonoBehaviour
 {
-    [Range(2, 512)]
+    [Range(2, 256)]
     public int chunkLength = 256;
     
     public ChunkParameters parameters;
@@ -29,7 +29,11 @@ public class ChunkDisplayer : MonoBehaviour
         Mesh mesh = generator.GenerateChunk(chunkLength, noiseMap);
         meshFilter.sharedMesh = mesh;
         // Texture
-        Texture2D texture = generator.GenerateTexture(chunkLength, noiseMap);
-        meshRenderer.sharedMaterial = new Material(Shader.Find("Standard")) {mainTexture = texture};
+        meshRenderer.sharedMaterial = new Material(Shader.Find("Standard"));
+        if (parameters.showTexture)
+        {
+            Texture2D texture = generator.GenerateTexture(chunkLength, noiseMap);
+            meshRenderer.sharedMaterial.mainTexture = texture;
+        }
     }
 }

@@ -29,7 +29,6 @@ public class ChunkGenerator
         float[,] map = new float[chunkLength, chunkLength];
         float delta = parameters.chunkSize / (chunkLength - 1);
 
-        float globalFactor = parameters.noiseFactors.Sum();
         for (int i = 0; i < chunkLength; i++)
         {
             for (int j = 0; j < chunkLength; j++)
@@ -42,7 +41,7 @@ public class ChunkGenerator
                     Vector2 noiseVertex = new Vector2(j * delta + initialPosition.x, i * delta + initialPosition.z);
                     noise += noiseFactor * Mathf.PerlinNoise(noiseScale * noiseVertex.x + 1000f, noiseScale * noiseVertex.y + 1000f);
                 }
-                map[i, j] = noise / globalFactor;
+                map[i, j] = noise;
             }
         }
         return map;
@@ -57,7 +56,7 @@ public class ChunkGenerator
         {
             for (int j = 0; j < chunkLength; j++)
             {
-                Color color = Color.Lerp(Color.black, Color.white, noiseMap[i, j]);
+                Color color = Color.Lerp(Color.black, Color.white, Mathf.Clamp01(noiseMap[i, j] / parameters.globalNoiseFactor));
                 texture.SetPixel(i, j, color);
             }
         }
@@ -93,7 +92,8 @@ public class ChunkGenerator
                         {
                             int newI = i + triangle.x;
                             int newJ = j + triangle.y;
-                            float height = parameters.elevationCurve.Evaluate(noiseMap[newI, newJ]) * parameters.elevationFactor;
+                            float curveValue = parameters.elevationCurve.Evaluate(noiseMap[newI, newJ] / parameters.globalNoiseFactor);
+                            float height = curveValue * parameters.globalNoiseFactor * parameters.elevationFactor;
                             triangles.Add(vertices.Count);
                             vertices.Add(new Vector3(newJ * delta, height, newI * delta));
                             uvs.Add(new Vector2((float)newI / chunkLength, (float)newJ / chunkLength));
@@ -103,7 +103,8 @@ public class ChunkGenerator
                 else
                 // Standard
                 {
-                    float height = parameters.elevationCurve.Evaluate(noiseMap[i, j]) * parameters.elevationFactor;
+                    float curveValue = parameters.elevationCurve.Evaluate(noiseMap[i, j] / parameters.globalNoiseFactor);
+                    float height = curveValue * parameters.globalNoiseFactor * parameters.elevationFactor;
                     vertices.Add(new Vector3(j * delta, height, i * delta));
                     uvs.Add(new Vector2((float)i / chunkLength, (float)j / chunkLength));
                     if (i < chunkLength - 1 && j < chunkLength - 1)

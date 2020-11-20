@@ -55,11 +55,15 @@ public class Chunk : MonoBehaviour
         }
         meshFilter.sharedMesh = meshes[chunkLength];
         // Texture
-        if (!textures.ContainsKey(chunkLength))
+        meshRenderer.sharedMaterial = new Material(Shader.Find("Standard"));
+        if (parameters.showTexture)
         {
-            Texture2D texture = generator.GenerateTexture(chunkLength, noiseMaps[chunkLength]);
-            textures.Add(chunkLength, texture);
+            if (!textures.ContainsKey(chunkLength))
+            {
+                Texture2D texture = generator.GenerateTexture(chunkLength, noiseMaps[chunkLength]);
+                textures.Add(chunkLength, texture);
+            }
+            meshRenderer.sharedMaterial.mainTexture = textures[chunkLength];
         }
-        meshRenderer.sharedMaterial = new Material(Shader.Find("Standard")) {mainTexture = textures[chunkLength]};
     }
 }
