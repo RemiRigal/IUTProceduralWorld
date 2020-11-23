@@ -5,14 +5,13 @@ using UnityEngine;
 public class ChunkDisplayer : MonoBehaviour
 {
     [Range(2, 256)]
-    public int chunkLength = 256;
-    
+    public int chunkLength = 64;
     public ChunkParameters parameters;
     
     private MeshFilter meshFilter;
     private MeshRenderer meshRenderer;
     
-    private void OnValidate()
+    void DisplayChunk()
     {
         if (meshFilter == null)
         {
@@ -24,16 +23,18 @@ public class ChunkDisplayer : MonoBehaviour
         }
         ChunkGenerator generator = new ChunkGenerator(parameters);
         // Noise map
-        float[,] noiseMap = generator.GenerateNoiseMap(chunkLength, Vector3.zero);
-        // Mesh
-        Mesh mesh = generator.GenerateChunk(chunkLength, noiseMap);
-        meshFilter.sharedMesh = mesh;
+        float[,] noiseMap = generator.GenerateNoiseMap(chunkLength, transform.position);
         // Texture
+        Texture2D texture = generator.GenerateTexture(chunkLength, noiseMap);
         meshRenderer.sharedMaterial = new Material(Shader.Find("Standard"));
-        if (parameters.showTexture)
-        {
-            Texture2D texture = generator.GenerateTexture(chunkLength, noiseMap);
-            meshRenderer.sharedMaterial.mainTexture = texture;
-        }
+        meshRenderer.sharedMaterial.mainTexture = texture;
+        // Mesh
+        Mesh mesh = generator.GenerateMesh(chunkLength, noiseMap);
+        meshFilter.sharedMesh = mesh;
+    }
+    
+    private void OnValidate()
+    {
+        DisplayChunk();
     }
 }

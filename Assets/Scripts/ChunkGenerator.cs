@@ -6,40 +6,29 @@ using UnityEngine;
 
 public class ChunkGenerator
 {
-    
     private ChunkParameters parameters;
-    
-    private readonly List<Vector2Int> intermediateTriangles = new List<Vector2Int>
-    {
-        new Vector2Int(0, 0),
-        new Vector2Int(1, 1),
-        new Vector2Int(0, 1),
-        new Vector2Int(1, 1),
-        new Vector2Int(0, 0),
-        new Vector2Int(1, 0),
-    };
 
-    public ChunkGenerator(ChunkParameters parameters)
+    public ChunkGenerator(ChunkParameters param)
     {
-        this.parameters = parameters;
+        this.parameters = param;
     }
-    
+
     public float[,] GenerateNoiseMap(int chunkLength, Vector3 initialPosition)
     {
         float[,] map = new float[chunkLength, chunkLength];
         float delta = parameters.chunkSize / (chunkLength - 1);
-
         for (int i = 0; i < chunkLength; i++)
         {
             for (int j = 0; j < chunkLength; j++)
             {
                 float noise = 0f;
-                for (int layer = 0; layer < parameters.noiseFactors.Length; layer++)
+                float perlinX = j * delta + initialPosition.x;
+                float perlinY = i * delta + initialPosition.z;
+                for (int layer = 0; layer < parameters.noiseScale.Length; layer++)
                 {
-                    float noiseScale = parameters.noiseScales[layer];
+                    float noiseScale = parameters.noiseScale[layer];
                     float noiseFactor = parameters.noiseFactors[layer];
-                    Vector2 noiseVertex = new Vector2(j * delta + initialPosition.x, i * delta + initialPosition.z);
-                    noise += noiseFactor * Mathf.PerlinNoise(noiseScale * noiseVertex.x + 1000f, noiseScale * noiseVertex.y + 1000f);
+                    noise += noiseFactor * Mathf.PerlinNoise(perlinX * noiseScale, perlinY * noiseScale);
                 }
                 map[i, j] = noise;
             }
@@ -51,12 +40,14 @@ public class ChunkGenerator
     {
         Texture2D texture = new Texture2D(chunkLength, chunkLength);
         texture.filterMode = FilterMode.Point;
-        
+        float globalFactor = parameters.noiseFactors.Sum();
+
         for (int i = 0; i < chunkLength; i++)
         {
             for (int j = 0; j < chunkLength; j++)
             {
-                Color color = Color.Lerp(Color.black, Color.white, Mathf.Clamp01(noiseMap[i, j] / parameters.globalNoiseFactor));
+                float noise = noiseMap[i, j];
+                Color color = Color.Lerp(Color.black, Color.white, noise / globalFactor);
                 texture.SetPixel(i, j, color);
             }
         }
@@ -65,65 +56,45 @@ public class ChunkGenerator
         return texture;
     }
     
-    public Mesh GenerateChunk(int chunkLength, float[,] noiseMap)
+    public Mesh GenerateMesh(int chunkLength, float[,] noiseMap)
     {
-        // New Mesh instance
         Mesh mesh = new Mesh();
 
-        // The distance between two vertices is the total size divided by the number of vertices minus 1
         float delta = parameters.chunkSize / (chunkLength - 1);
+        float globalFactor = parameters.noiseFactors.Sum();
         
-        // Those lists contains the vertices, the triangles and the uv coordinates of the grid
         List<Vector3> vertices = new List<Vector3>();
         List<int> triangles = new List<int>();
         List<Vector2> uvs = new List<Vector2>();
-
-        // Main loops iterating through all the vertices
+        
         for (int i = 0; i < chunkLength; i++)
         {
             for (int j = 0; j < chunkLength; j++)
             {
-                // Low Poly
-                if (parameters.lowPoly)
+                float altitude = parameters.elevationCurve.Evaluate(noiseMap[i, j] / globalFactor) * parameters.elevationFactor;
+                Vector3 vertex = new Vector3(j * delta, altitude, i * delta);
+                vertices.Add(vertex);
+                
+                Vector2 uvCoordinate = new Vector2((float)i / chunkLength, (float)j / chunkLength);
+                uvs.Add(uvCoordinate);
+
+                if (i < chunkLength - 1 && j < chunkLength - 1)
                 {
-                    if (i < chunkLength - 1 && j < chunkLength - 1)
-                    {
-                        foreach (Vector2Int triangle in intermediateTriangles)
-                        {
-                            int newI = i + triangle.x;
-                            int newJ = j + triangle.y;
-                            float curveValue = parameters.elevationCurve.Evaluate(noiseMap[newI, newJ] / parameters.globalNoiseFactor);
-                            float height = curveValue * parameters.globalNoiseFactor * parameters.elevationFactor;
-                            triangles.Add(vertices.Count);
-                            vertices.Add(new Vector3(newJ * delta, height, newI * delta));
-                            uvs.Add(new Vector2((float)newI / chunkLength, (float)newJ / chunkLength));
-                        }
-                    }
-                }
-                else
-                // Standard
-                {
-                    float curveValue = parameters.elevationCurve.Evaluate(noiseMap[i, j] / parameters.globalNoiseFactor);
-                    float height = curveValue * parameters.globalNoiseFactor * parameters.elevationFactor;
-                    vertices.Add(new Vector3(j * delta, height, i * delta));
-                    uvs.Add(new Vector2((float)i / chunkLength, (float)j / chunkLength));
-                    if (i < chunkLength - 1 && j < chunkLength - 1)
-                    {
-                        foreach (Vector2Int triangle in intermediateTriangles)
-                        {
-                            triangles.Add((i + triangle.x) * chunkLength + (j + triangle.y));
-                        }
-                    }
+                    triangles.Add(i * chunkLength + j);
+                    triangles.Add((i + 1) * chunkLength + j + 1);
+                    triangles.Add(i * chunkLength + j + 1);
+                    
+                    triangles.Add((i + 1) * chunkLength + j + 1);
+                    triangles.Add(i * chunkLength + j);
+                    triangles.Add((i + 1) * chunkLength + j);
                 }
             }
         }
         
-        // Those three functions links the three lists we just made with the mesh instance
         mesh.SetVertices(vertices);
         mesh.SetTriangles(triangles, 0);
         mesh.SetUVs(0, uvs);
 
-        // It is necessary to call the 'RecalculateNormals' function for a mesh
         mesh.RecalculateNormals();
         return mesh;
     }
