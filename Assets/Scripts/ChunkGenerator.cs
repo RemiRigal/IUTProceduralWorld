@@ -9,6 +9,16 @@ using UnityEngine;
 public class ChunkGenerator
 {
     private ChunkParameters parameters;
+    
+    private readonly List<Vector2Int> tri = new List<Vector2Int>
+    {
+        new Vector2Int(0, 0),
+        new Vector2Int(1, 1),
+        new Vector2Int(0, 1),
+        new Vector2Int(1, 1),
+        new Vector2Int(0, 0),
+        new Vector2Int(1, 0)
+    };
 
     // Constructor of the object, each instance is linked with a ChunkParameters instance
     public ChunkGenerator(ChunkParameters param)
@@ -34,7 +44,7 @@ public class ChunkGenerator
                 {
                     float noiseScale = parameters.noiseScale[layer];
                     float noiseFactor = parameters.noiseFactors[layer];
-                    noise += noiseFactor * Mathf.PerlinNoise(perlinX * noiseScale, perlinY * noiseScale);
+                    noise += noiseFactor * Mathf.PerlinNoise(10000f + perlinX * noiseScale, 10000f + perlinY * noiseScale);
                 }
                 map[i, j] = noise;
             }
@@ -81,24 +91,42 @@ public class ChunkGenerator
         {
             for (int j = 0; j < chunkLength; j++)
             {
-                // The normalized noise value is used to evaluate the elevation curve
-                // The multiplier 'elevationFactor' is then applied to the final altitude
-                float altitude = parameters.elevationCurve.Evaluate(noiseMap[i, j] / globalFactor) * parameters.elevationFactor;
-                Vector3 vertex = new Vector3(j * delta, altitude, i * delta);
-                vertices.Add(vertex);
-                
-                Vector2 uvCoordinate = new Vector2((float)i / chunkLength, (float)j / chunkLength);
-                uvs.Add(uvCoordinate);
 
-                if (i < chunkLength - 1 && j < chunkLength - 1)
+                if (parameters.lowPoly)
                 {
-                    triangles.Add(i * chunkLength + j);
-                    triangles.Add((i + 1) * chunkLength + j + 1);
-                    triangles.Add(i * chunkLength + j + 1);
-                    
-                    triangles.Add((i + 1) * chunkLength + j + 1);
-                    triangles.Add(i * chunkLength + j);
-                    triangles.Add((i + 1) * chunkLength + j);
+                    // LowPoly
+                    if (i < chunkLength - 1 && j < chunkLength - 1)
+                    {
+                        foreach (Vector2Int triDelta in tri)
+                        {
+                            int newI = i + triDelta.x;
+                            int newJ = j + triDelta.y;
+                        
+                            triangles.Add(vertices.Count);
+                            float altitude = parameters.elevationCurve.Evaluate(noiseMap[newI, newJ] / globalFactor) * parameters.elevationFactor;
+                            Vector3 vertex = new Vector3(newJ * delta, altitude, newI * delta);
+                            vertices.Add(vertex);
+                            Vector2 uvCoordinate = new Vector2((float)newI / chunkLength, (float)newJ / chunkLength);
+                            uvs.Add(uvCoordinate);
+                        }
+                    }
+                }
+                else
+                {
+                    // Standard
+                    // The normalized noise value is used to evaluate the elevation curve
+                    // The multiplier 'elevationFactor' is then applied to the final altitude
+                    float altitude = parameters.elevationCurve.Evaluate(noiseMap[i, j] / globalFactor) * parameters.elevationFactor;
+                    Vector3 vertex = new Vector3(j * delta, altitude, i * delta);
+                    vertices.Add(vertex);
+                
+                    Vector2 uvCoordinate = new Vector2((float)i / chunkLength, (float)j / chunkLength);
+                    uvs.Add(uvCoordinate);
+
+                    if (i < chunkLength - 1 && j < chunkLength - 1)
+                    {
+                        triangles.AddRange(tri.Select(triDelta => (i + triDelta.x) * chunkLength + (j + triDelta.y)));
+                    }
                 }
             }
         }
